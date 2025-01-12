@@ -12,7 +12,15 @@ pub fn main() !void {
 
         var input = std.mem.splitSequence(u8, user_input, " ");
 
-        const command = input.next().?;
-        stdout.print("{s}: command not found\n", .{command}) catch {};
+        const command = input.next();
+
+        if (command) |c| {
+            if (std.mem.eql(u8, c, "exit")) {
+                const exit_code = try std.fmt.parseInt(u8, input.next() orelse "0", 10);
+                std.process.exit(exit_code);
+            } else {
+                try stdout.print("{s}: command not found\n", .{c});
+            }
+        }
     }
 }
