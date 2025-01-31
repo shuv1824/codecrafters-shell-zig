@@ -44,7 +44,7 @@ fn handle_type(args: []const u8) !void {
     if (args_type) |@"type"| {
         try stdout.print("{s} is a shell builtin\n", .{@tagName(@"type")});
     } else {
-        try stdout.print("{s}: not found\n", .{args});
+        try find_in_path(args);
     }
 }
 
@@ -61,4 +61,35 @@ fn handle_input(input: []const u8) !void {
     } else {
         try stdout.print("{s}: command not found\n", .{command});
     }
+}
+
+fn find_in_path(args: []const u8) !void {
+    const allocator = std.heap.page_allocator;
+    const env_vars = try std.process.getEnvMap(allocator);
+    const path_value = env_vars.get("PATH") orelse "";
+    var path_it = std.mem.splitSequence(u8, path_value, ":");
+
+    while (path_it.next()) |path| {
+        const full_path = try std.fs.path.join(allocator, &[_][]const u8{ path, args });
+        defer allocator.free(full_path);
+
+        const file = std.fs.openFileAbsolute(full_path, .{ .mode = .read_only }) catch {
+            continue;
+        };
+        defer file.close();
+
+        const mode = file.mode() catch {
+            continue;
+        };
+
+        const is_executable = mode & 0b001 != 0;
+        if (!is_executable) {
+            continue;
+        }
+
+        try stdout.print("{s} is {s}\n", .{ args, full_path });
+        return;
+    }
+
+    try stdout.print("{s}: not found\n", .{args});
 }
